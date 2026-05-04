@@ -50,6 +50,8 @@ def beep(freq=1000, duration=100):
 print("Sistema de Estacionamento Iniciado.")
 update_display("ESTACIONAMENTO", "AGUARDANDO CARRO")
 
+print("Teste")
+
 while True:
     current_time = time.ticks_ms()
 
@@ -105,6 +107,5 @@ while True:
                 last_blink = current_time
             update_display("TEMPO ESGOTADO!", "PAGUE O TICKET")
 
+  
     time.sleep_ms(50)
-    
-    print("Teste")
