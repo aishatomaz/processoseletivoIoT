@@ -28,7 +28,8 @@ jobs:
     - name: Test with Wokwi
       uses: wokwi/wokwi-ci-action@v1
       with:
+        expect_text: 'ESTACIONAMENTO'
         token: ${{ secrets.WOKWI_CLI_TOKEN }}
         path: .
-        expect_text: 'Teste'
+
         diagram_file: diagram.json

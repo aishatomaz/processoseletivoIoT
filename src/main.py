@@ -1,4 +1,4 @@
-print("Teste") # Testando actions
+print("ESTACIONAMENTO") # Testando actions
 sys.stdout.flush()
 
 import machine
@@ -41,7 +41,7 @@ def beep(freq=1000, duration=100):
     time.sleep_ms(duration)
     buzzer.duty(0)
 
-print("Teste")
+print("ESTACIONAMENTO")
 print("Sistema de Estacionamento Iniciado.")
 update_display("ESTACIONAMENTO", "INICIANDO")
 
