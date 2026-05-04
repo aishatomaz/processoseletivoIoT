@@ -47,10 +47,10 @@ def beep(freq=1000, duration=100):
     time.sleep_ms(duration)
     buzzer.duty(0)
 
+print("Teste")
 print("Sistema de Estacionamento Iniciado.")
 update_display("ESTACIONAMENTO", "AGUARDANDO CARRO")
 
-print("Teste")
 
 while True:
     current_time = time.ticks_ms()
