@@ -106,3 +106,5 @@ while True:
             update_display("TEMPO ESGOTADO!", "PAGUE O TICKET")
 
     time.sleep_ms(50)
+    
+    print("Teste")
