@@ -1,64 +1,46 @@
 {
   "version": 1,
-  "author": "User Test 1",
+  "author": "Shirou",
   "editor": "wokwi",
   "parts": [
-    { "type": "wokwi-esp32-devkit-v1", "id": "esp", "top": 0, "left": 0, "attrs": {} },
-    {
-      "type": "wokwi-led",
-      "id": "led_green",
-      "top": 111.6,
-      "left": 215,
-      "attrs": { "color": "green" }
-    },
-    {
-      "type": "wokwi-led",
-      "id": "led_yellow",
-      "top": 102,
-      "left": 167,
-      "attrs": { "color": "yellow" }
-    },
-    {
-      "type": "wokwi-led",
-      "id": "led_red",
-      "top": 92.4,
-      "left": 119,
-      "attrs": { "color": "red" }
-    },
-    { "type": "wokwi-buzzer", "id": "bz1", "top": 0, "left": 200, "attrs": {} },
-    {
-      "type": "wokwi-pushbutton",
-      "id": "btn_start",
-      "top": 246.2,
-      "left": -48,
-      "attrs": { "label": "Entrada", "color": "green" }
-    },
-    {
-      "type": "wokwi-pushbutton",
-      "id": "btn_reset",
-      "top": 250,
-      "left": 50,
-      "attrs": { "label": "Saida", "color": "red" }
-    },
-    { "type": "wokwi-lcd1602", "id": "lcd1", "top": -200, "left": -50, "attrs": {} }
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-pushbutton", "id": "btnEntrada", "top": -70, "left": -130, "attrs": { "color": "green", "label": "ENTRADA" } },
+    { "type": "wokwi-pushbutton", "id": "btnSaida", "top": 20, "left": -130, "attrs": { "color": "blue", "label": "SAIDA" } },
+    { "type": "wokwi-led", "id": "ledVerde", "top": -85, "left": 230, "attrs": { "color": "green", "label": "VAGAS" } },
+    { "type": "wokwi-led", "id": "ledAmarelo", "top": -20, "left": 230, "attrs": { "color": "yellow", "label": "QUASE LOTADO" } },
+    { "type": "wokwi-led", "id": "ledVermelho", "top": 45, "left": 230, "attrs": { "color": "red", "label": "LOTADO" } },
+    { "type": "wokwi-resistor", "id": "rVerde", "top": -50, "left": 290, "attrs": { "value": "220" } },
+    { "type": "wokwi-resistor", "id": "rAmarelo", "top": 15, "left": 290, "attrs": { "value": "220" } },
+    { "type": "wokwi-resistor", "id": "rVermelho", "top": 80, "left": 290, "attrs": { "value": "220" } },
+    { "type": "wokwi-buzzer", "id": "buzzer", "top": 135, "left": 220, "attrs": { "volume": "0.1" } },
+    { "type": "wokwi-servo", "id": "servoCancela", "top": 135, "left": -120, "attrs": { "hornColor": "black" } }
   ],
   "connections": [
-    [ "esp:GND.1", "led_green:C", "black", [ "v0" ] ],
-    [ "esp:D2", "led_green:A", "green", [ "v0" ] ],
-    [ "esp:GND.1", "led_yellow:C", "black", [ "v0" ] ],
-    [ "esp:D4", "led_yellow:A", "yellow", [ "v0" ] ],
-    [ "esp:GND.1", "led_red:C", "black", [ "v0" ] ],
-    [ "esp:D5", "led_red:A", "red", [ "v0" ] ],
-    [ "esp:GND.1", "bz1:1", "black", [ "v0" ] ],
-    [ "esp:D18", "bz1:2", "purple", [ "v0" ] ],
-    [ "esp:GND.1", "btn_start:1.l", "black", [ "v0" ] ],
-    [ "esp:D14", "btn_start:2.r", "white", [ "v0" ] ],
-    [ "esp:GND.1", "btn_reset:1.l", "black", [ "v0" ] ],
-    [ "esp:D27", "btn_reset:2.r", "white", [ "v0" ] ],
-    [ "esp:GND.1", "lcd1:GND", "black", [ "v0" ] ],
-    [ "esp:VIN", "lcd1:VCC", "red", [ "v0" ] ],
-    [ "esp:D21", "lcd1:SDA", "blue", [ "v0" ] ],
-    [ "esp:D22", "lcd1:SCL", "yellow", [ "v0" ] ]
-  ],
-  "dependencies": {}
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+
+    [ "btnEntrada:1.l", "esp:GND.1", "black", [] ],
+    [ "btnEntrada:2.l", "esp:18", "green", [] ],
+    [ "btnSaida:1.l", "esp:GND.1", "black", [] ],
+    [ "btnSaida:2.l", "esp:19", "blue", [] ],
+
+    [ "esp:25", "ledVerde:A", "green", [] ],
+    [ "ledVerde:C", "rVerde:1", "black", [] ],
+    [ "rVerde:2", "esp:GND.2", "black", [] ],
+
+    [ "esp:26", "ledAmarelo:A", "gold", [] ],
+    [ "ledAmarelo:C", "rAmarelo:1", "black", [] ],
+    [ "rAmarelo:2", "esp:GND.2", "black", [] ],
+
+    [ "esp:27", "ledVermelho:A", "red", [] ],
+    [ "ledVermelho:C", "rVermelho:1", "black", [] ],
+    [ "rVermelho:2", "esp:GND.2", "black", [] ],
+
+    [ "buzzer:1", "esp:14", "purple", [] ],
+    [ "buzzer:2", "esp:GND.2", "black", [] ],
+
+    [ "servoCancela:PWM", "esp:13", "orange", [] ],
+    [ "servoCancela:V+", "esp:5V", "red", [] ],
+    [ "servoCancela:GND", "esp:GND.1", "black", [] ]
+  ]
 }

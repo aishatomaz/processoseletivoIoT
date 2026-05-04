@@ -1,31 +1,30 @@
-name: Wokwi MicroPython CI
+name: Wokwi CI - Estacionamento Inteligente
 
 on:
   push:
+    branches: [ main, feat/actions-build ]
   pull_request:
+    branches: [ main ]
 
 jobs:
-  test:
+  build-and-simulate:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Instalar ferramentas
+      - name: Build filesystem with main.py
         run: |
-          pip install mpremote
-          wget -q -O wokwi-cli https://github.com/wokwi/wokwi-cli/releases/latest/download/wokwi-cli-linuxstatic-x64
-          chmod +x wokwi-cli
+          docker build -t esp32-python-fs -f Dockerfile .
+          docker run --name esp32-python-fs-builder esp32-python-fs /bin/bash
+          docker cp esp32-python-fs-builder:/fs.bin .
 
-      - name: Baixar firmware MicroPython ESP32
-        run: |
-          wget -q -O micropython.bin https://github.com/wokwi/wokwi-vscode-micropython/raw/main/esp32/firmware.bin
-
-      - name: Rodar Wokwi
-        env:
-          WOKWI_CLI_TOKEN: ${{ secrets.WOKWI_CLI_TOKEN }}
-        run: |
-          ./wokwi-cli --timeout 30000 --diagram-file diagram.json . > serial.log 2>&1 &
-          sleep 5
-          python -m mpremote connect port:rfc2217://localhost:4000 run main.py | tee -a serial.log
-          grep "ESTACIONAMENTO" serial.log
+      - name: Run Wokwi simulation
+        uses: wokwi/wokwi-ci-action@v1
+        with:
+          token: ${{ secrets.WOKWI_API_KEY }}
+          path: .
+          diagram_file: diagram.json
+          expect_text: ESTACIONAMENTO
+          timeout: 10000
