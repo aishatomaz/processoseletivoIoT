@@ -1,9 +1,9 @@
+print("Teste") # Testando actions
+sys.stdout.flush()
+
 import machine
 import time
 import sys
-
-print("Teste") # Testando actions
-sys.stdout.flush()
 
 # simplificando pinos de leitura
 PIN_LED_GREEN = 2
