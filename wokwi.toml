@@ -1,4 +1,5 @@
 [wokwi]
 version = 1
-firmware = "main.py"
+firmware = 'binaries/micropython.bin'
+fs = 'fs.bin'
 rfc2217ServerPort = 4000
