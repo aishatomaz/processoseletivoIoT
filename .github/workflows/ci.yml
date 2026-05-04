@@ -30,6 +30,6 @@ jobs:
       with:
         token: ${{ secrets.WOKWI_CLI_TOKEN }}
         timeout: 100000
-        path: /
+        path: .
         expect_text: 'Teste'
         diagram_file: diagram.json
