@@ -1,35 +1,31 @@
-name: ESP32 Filesystem Build
+name: Wokwi MicroPython CI
 
 on:
   push:
-    branches:
-      - main
-      - feat/actions-build
   pull_request:
-    branches:
-      - main
 
 jobs:
-  build_filesystem:
+  test:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Build Docker image
-      run: docker build -t esp32-builder -f Dockerfile .
+      - name: Instalar ferramentas
+        run: |
+          pip install mpremote
+          wget -q -O wokwi-cli https://github.com/wokwi/wokwi-cli/releases/latest/download/wokwi-cli-linuxstatic-x64
+          chmod +x wokwi-cli
 
-    - name: Run container and generate fs.bin
-      run: |
-        docker run --name esp32-fs-builder esp32-builder echo done
-        docker cp esp32-fs-builder:/fs.bin ./fs.bin
+      - name: Baixar firmware MicroPython ESP32
+        run: |
+          wget -q -O micropython.bin https://github.com/wokwi/wokwi-vscode-micropython/raw/main/esp32/firmware.bin
 
-    - name: Test with Wokwi
-      uses: wokwi/wokwi-ci-action@v1
-      with:
-        expect_text: 'ESTACIONAMENTO'
-        token: ${{ secrets.WOKWI_CLI_TOKEN }}
-        path: .
-
-        diagram_file: diagram.json
+      - name: Rodar Wokwi
+        env:
+          WOKWI_CLI_TOKEN: ${{ secrets.WOKWI_CLI_TOKEN }}
+        run: |
+          ./wokwi-cli --timeout 30000 --diagram-file diagram.json . > serial.log 2>&1 &
+          sleep 5
+          python -m mpremote connect port:rfc2217://localhost:4000 run main.py | tee -a serial.log
+          grep "ESTACIONAMENTO" serial.log
