@@ -1,4 +1,8 @@
 [wokwi]
 version = 1
-firmware = "flasher_args.json"
-rfc2217ServerPort = 4000
+firmware = 'firmware.bin' # Nome do arquivo .bin do MicroPython que deve estar na raiz
+elf = ''
+
+[[binaries]]
+path = 'fs.bin' # Arquivo do docker
+offset = 0x200000
