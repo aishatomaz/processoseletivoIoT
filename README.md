@@ -1,3 +1,8 @@
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/d076ce24-634a-42b8-9e2a-ffa88816a7a9" width="45%" />
+  <img src="https://github.com/user-attachments/assets/d076ce24-634a-42b8-9e2a-ffa88816a7a9" width="45%" />
+</p>
+
 # Sistema de Controle de Estacionamento com Temporizador
 
 > Projeto desenvolvido para o processo seletivo **Intensivo Maker | IoT** – Etapa Prática de Sistemas Embarcados.
@@ -16,119 +21,137 @@
 ##  Ꮺ Visão Geral da Solução ¹ 
 
 
-O projeto simula um **sistema de controle de tempo de permanência em uma vaga de estacionamento** utilizando um ESP32 com MicroPython. Ao ser acionado, o sistema inicia uma contagem regressiva de 10 segundos e sinaliza progressivamente o nível de urgência por meio de LEDs coloridos, sinais sonoros e mensagens em um display LCD. A ideia do projeto é advindo do atual sistema do Cariri Garden Shopping de Juazeiro do Norte-CE, o mesmo não possui um sistema que sinaliza o tempo de permanência, algo que fica a critério do cliente ficar em constante verificação.
-
-O comportamento do sistema pode ser resumido assim:
-
-| Fase              | Tempo       | LED       | Buzzer | LCD                     |
-|-------------------|-------------|-----------|--------|--------------------------|
-| Entrada / Normal  | 0 – 4 s     | 🟢 Verde  | Beep   | `TEMPO RESTANTE / X s`  |
-| Atenção           | 4 – 7 s     | 🟡 Amarelo| Beep   | `TEMPO RESTANTE / X s`  |
-| Crítico           | 7 – 10 s    | 🔴 Vermelho| Beep  | `TEMPO RESTANTE / X s`  |
-| Tempo esgotado    | > 10 s      | 🔴 Piscando| Alarme| `TEMPO ESGOTADO! / PAGUE O TICKET` |
-
-O botão **Entrada** simula a chegada de um veículo e o botão **Saída** representa a liberação da vaga (ambos conectados no circuito e disponíveis para expansão futura da lógica).
+O projeto simula um Sistema de Controle de Acesso para Estacionamento, desenvolvido em MicroPython para o microcontrolador **ESP32** e executado no simulador **Wokwi**. A idealização dele foi baseado no sistema de estacionamento do Cariri Garden Shopping de Juazeiro do Norte-CE, que possui um tempo de gratuidade e, após expirar o tempo limite, o cliente deve pagar pelas horas usadas do estacionamento.
+O sistema gerencia até 5 vagas simultâneas e controla automaticamente a entrada e saída de veículos. Quando um veículo chega, o usuário pressiona o botão **ENTRADA**; ao sair, pressiona o botão **SAÍDA**. O sistema valida se há vaga disponível, abre a cancela (servo motor), emite um sinal sonoro e atualiza a sinalização luminosa (LEDs verde, amarelo e vermelho) de acordo com a ocupação atual.
+ 
+Se o estacionamento estiver lotado, a entrada é bloqueada e um bipe mais longo é emitido como alerta.
 
 ---
 
 ## Ꮺ Arquitetura do Sistema Embarcado ²
-
+ 
+O firmware foi estruturado como uma **máquina de estados não bloqueante**, evitando o uso de `sleep()` longos que travariam o loop principal.
+ 
 ### Fluxo principal (`main.py`)
-
+ 
 ```
-Inicialização dos pinos (GPIO, PWM, LCD via print serial)
-              │
-              ▼
-        Beep de entrada
-              │
-              ▼
-  ┌──────────────────────────────────────┐
-  │          Loop principal              │  ← executa a cada 200 ms
-  │                                      │
-  │  1. Calcula tempo decorrido          │
-  │  2. Define fase (verde/amarelo/red)  │
-  │  3. Aciona LED correspondente        │
-  │  4. Emite beep na transição de fase  │
-  │  5. Exibe tempo restante no LCD      │
-  │  6. Se esgotado: pisca LED + alarme  │
-  └──────────────────────────────────────┘
-              │
-              ▼
-    Encerra após TOTAL_TIME + 3 s
-    (LEDs e buzzer desligados)
+main()
+ └── EstacionamentoInteligente()
+      └── loop: sistema.atualizar()  [a cada 50 ms]
+           ├── BotaoComDebounce → detecta borda de pressionamento (ENTRADA / SAÍDA)
+           ├── registrar_entrada() ou registrar_saida()
+           │    ├── verifica capacidade
+           │    ├── Cancela.abrir_temporariamente()  → servo abre por 1200 ms
+           │    ├── AlarmeSonoro.bip()               → buzzer dispara por 120 ms
+           │    └── atualizar_sinalizacao()           → LEDs refletem ocupação
+           ├── Cancela.atualizar()   → fecha servo quando o tempo expira
+           ├── AlarmeSonoro.atualizar() → desliga buzzer quando o tempo expira
+           └── imprimir_status_periodico() → log serial a cada 3 s
 ```
-### │﹒ Imagem para melhor visualização
-<img width="619" height="533" alt="leds" src="https://github.com/user-attachments/assets/c97af2a0-0e18-4606-9663-1ef67aa6b1ac" />
-
-- OBS: Todos os leds serão acesos de acordo com os padrões estabelecidos e falados anterioremente. 
-
-
+ 
+### Classes e responsabilidades
+ 
+| Classe | Responsabilidade |
+|---|---|
+| `BotaoComDebounce` | Detecta borda de descida (pressionamento) com debounce de 80 ms |
+| `Cancela` | Controla o servo sem bloquear o loop (temporizador por `ticks_ms`) |
+| `AlarmeSonoro` | Emite bipes de duração configurável sem `sleep` |
+| `EstacionamentoInteligente` | Orquestra todos os componentes e mantém o contador de vagas |
+ 
 ### Estrutura de temporização
-
-O sistema usa `time.ticks_ms()` e `time.ticks_diff()` para medir o tempo decorrido com precisão desde o início da simulação, sem depender de `time.sleep()` no loop principal — o que permite que o loop execute a cada 200 ms e reaja rapidamente a eventos como o piscar do LED no estado de alarme (intervalo de 300 ms).
-
-### Transições de fase
-
-As transições entre fases são detectadas comparando `elapsed_seconds` com as constantes `GREEN_LIMIT`, `YELLOW_LIMIT` e `RED_LIMIT`. Beeps distintos são emitidos a cada transição para alertar o usuário de forma sonora:
-
-- **1500 Hz** na entrada
-- **1200 Hz** ao entrar na fase amarela
-- **800 Hz** ao entrar na fase vermelha
-- **2000 Hz contínuo** no alarme de tempo esgotado
-
+ 
+Toda temporização é feita com `ticks_ms()` e `ticks_diff()` do MicroPython, garantindo que o loop principal rode a cada 50 ms sem interrupções. Isso permite que múltiplos componentes (servo, buzzer, LEDs) sejam gerenciados de forma concorrente dentro do mesmo ciclo, sem que um bloqueie o outro.
+ 
+### Transições de estado
+ 
+As transições entre estados de ocupação são detectadas comparando `vagas_ocupadas` com a `CAPACIDADE_MAXIMA`. Bipes distintos são emitidos conforme o evento:
+ 
+- **Bip curto (120 ms)** — entrada ou saída autorizada
+- **Bip médio (250 ms)** — tentativa de saída com estacionamento vazio
+- **Bip longo (350 ms)** — tentativa de entrada com estacionamento lotado
+ 
 ---
+
+### │﹒ Imagem para melhor visualização
+<img width="804" height="604" alt="led" src="https://github.com/user-attachments/assets/2757e44e-411f-4876-8c0b-9f23fb9ffdec" />
+
+> OBS: Todos os leds serão acesos de acordo com os padrões estabelecidos e falados anterioremente. 
+
 
 ## Ꮺ Componentes Utilizados na Simulação ³
-
-| Componente              | ID Wokwi      | GPIO   | Função                                                     |
-|------------------------|---------------|--------|------------------------------------------------------------|
-| ESP32 DevKit V1        | `esp`         | —      | Microcontrolador principal                                 |
-| LED Verde              | `led_green`   | D2     | Sinaliza fase inicial — vaga OK, tempo confortável         |
-| LED Amarelo            | `led_yellow`  | D4     | Sinaliza fase de atenção — tempo reduzido                  |
-| LED Vermelho           | `led_red`     | D5     | Sinaliza fase crítica e alarme — tempo esgotado            |
-| Buzzer                 | `bz1`         | D18    | Emite beeps de transição e alarme contínuo (PWM)           |
-| Botão Entrada          | `btn_start`   | D14    | Simula chegada do veículo na vaga                          |
-| Botão Saída            | `btn_reset`   | D27    | Simula saída / liberação da vaga                           |
-| Display LCD 16x2       | `lcd1`        | D21/D22| Exibe tempo restante e mensagens de estado (I²C)           |
-
+ 
+| Componente | ID Wokwi | GPIO | Função |
+|---|---|---|---|
+| ESP32 DevKit C v4 | `esp` | — | Microcontrolador principal |
+| Pushbutton (verde) | `btnEntrada` | GPIO 18 | Registra entrada de veículo |
+| Pushbutton (azul) | `btnSaida` | GPIO 19 | Registra saída de veículo |
+| LED Verde | `ledVerde` | GPIO 25 | Indica vagas disponíveis |
+| LED Amarelo | `ledAmarelo` | GPIO 26 | Alerta: última vaga disponível |
+| LED Vermelho | `ledVermelho` | GPIO 27 | Indica estacionamento lotado |
+| Resistores 220 Ω | `rVerde`, `rAmarelo`, `rVermelho` | — | Limitação de corrente nos LEDs |
+| Buzzer | `buzzer` | GPIO 14 | Sinal sonoro de confirmação ou alerta |
+| Servo Motor | `servoCancela` | GPIO 13 | Cancela de acesso (30° fechada / 115° aberta) |
+ 
+### Lógica de sinalização dos LEDs
+ 
+| Estado | LED Verde | LED Amarelo | LED Vermelho |
+|---|---|---|---|
+| Vagas livres (0–3 ocupadas) | ✅ Ligado | ❌ | ❌ |
+| Quase lotado (4 ocupadas) | ❌ | ✅ Ligado | ❌ |
+| Lotado (5 ocupadas) | ❌ | ❌ | ✅ Ligado |
+ 
 ---
-
+ 
 ## Ꮺ Decisões Técnicas Relevantes ⁴
-
-**Separação em funções nomeadas:** As operações de exibição (`update_display`), controle de LEDs (`set_leds`) e emissão sonora (`beep`) foram isoladas em funções, tornando o loop principal legível e facilitando manutenção.
-
-**Uso de `ticks_ms` em vez de `sleep` no loop:** O loop principal usa `time.sleep_ms(200)` apenas como cadência mínima, mas toda a lógica temporal é baseada em `ticks_diff`. Isso permite que o piscar do LED de alarme (300 ms) funcione corretamente dentro do mesmo loop sem bloquear a execução.
-
-**Constantes de limiar no topo do arquivo:** `TOTAL_TIME`, `GREEN_LIMIT`, `YELLOW_LIMIT` e `RED_LIMIT` são definidas como constantes nomeadas, seguindo boas práticas — qualquer ajuste de temporização é feito em um único lugar sem tocar na lógica.
-
-**PWM no buzzer com frequências distintas por fase:** Cada transição emite uma frequência diferente (1500 → 1200 → 800 Hz), criando uma linguagem sonora intuitiva: frequências decrescentes indicam urgência crescente.
-
-**Saída serial como substituto do LCD:** A função `update_display` faz `print` formatado no monitor serial, compatível com o ambiente de simulação e com o `expect_text` validado pelo pipeline do GitHub Actions.
-
-**Encerramento limpo com `sys.exit()`:** Após o fim da simulação, o código desliga todos os periféricos e encerra o processo, garantindo que o pipeline de CI finalize corretamente sem timeout.
-
+ 
+**Loop não bloqueante:** A principal decisão de arquitetura foi evitar qualquer `sleep()` dentro do loop principal. Toda temporização usa `ticks_ms()`, permitindo que botões, servo e buzzer sejam atualizados de forma concorrente dentro do mesmo ciclo de 50 ms.
+ 
+**Debounce por software:** A classe `BotaoComDebounce` implementa detecção de borda estável — só reconhece um pressionamento se o sinal permanecer estável por pelo menos 80 ms, eliminando leituras espúrias sem necessidade de hardware adicional.
+ 
+**Encapsulamento em classes:** Cada componente físico foi encapsulado em uma classe com responsabilidade única, facilitando leitura, manutenção e eventual expansão do sistema (ex: adicionar mais sensores ou trocar o servo por outro atuador).
+ 
+**Constantes nomeadas no topo do arquivo:** Todos os valores de configuração (pinos, capacidade, tempos) foram definidos como constantes, separando configuração de lógica e facilitando ajustes sem alterar o código funcional.
+ 
+**Fallback para Python local:** O bloco `try/except ImportError` permite executar e testar a sintaxe do código em Python padrão (sem MicroPython), agilizando o desenvolvimento antes de subir para simulação.
+ 
+**Saída serial estruturada:** Todas as mensagens de log seguem um padrão consistente (`ENTRADA autorizada`, `SAIDA autorizada`, `ESTACIONAMENTO LOTADO`), permitindo que o pipeline de CI valide o comportamento correto via `expect_text`.
+ 
 ---
-
+ 
 ## Ꮺ Resultados Obtidos ⁵
+ 
+- O sistema inicializa corretamente e imprime o banner `ESTACIONAMENTO INTELIGENTE iniciado` no monitor serial
+- Pressionamento do botão **ENTRADA** com vagas disponíveis → cancela abre, LED atualiza, bip curto emitido
+- Pressionamento do botão **ENTRADA** com estacionamento lotado → cancela permanece fechada, bip longo de alerta
+- Pressionamento do botão **SAÍDA** com veículos presentes → cancela abre, contador decrementa, sinalização atualiza
+- Pressionamento do botão **SAÍDA** com estacionamento vazio → operação ignorada com bip de aviso
+- Cancela fecha automaticamente após **1200 ms** sem bloquear demais operações
+- Status periódico impresso no monitor serial a cada **3 segundos**
+- O pipeline do **GitHub Actions** valida o texto `ESTACIONAMENTO` na saída serial, confirmando inicialização correta
+**Requisitos atendidos:**
+  > <img width="485" height="148" alt="pipeline" src="https://github.com/user-attachments/assets/9fe3c28f-2f27-4cc1-ba48-96d11ab7a633" />
 
-- O sistema inicializa, exibe o banner `ESTACIONAMENTO` no serial e emite um beep de entrada
-- O LED verde acende nos primeiros 4 segundos, indicando tempo confortável
-- Ao atingir 4 segundos, o sistema transiciona para o LED amarelo com beep de alerta
-- Ao atingir 7 segundos, o LED vermelho acende com beep de aviso crítico
-- Após 10 segundos, o LED vermelho começa a piscar e o buzzer emite alarme contínuo, com a mensagem `TEMPO ESGOTADO! / PAGUE O TICKET` no display
-- Aos 13 segundos, todos os periféricos são desligados e a simulação encerra com a mensagem `Simulação finalizada com sucesso.`
-- O pipeline do GitHub Actions não executa, não gerando o print necessário para dar continuidade ao teste.
-
+ 
+- ✦ Estrutura mínima de arquivos (`src/main.py`, `diagram.json`, `wokwi.toml`, `README.md`)
+- ✦ Código organizado e legível com classes e constantes
+- ✦ Simulação funcional no Wokwi
+- ✦ Pipeline de CI executando sem falhas
+- ✦ Commits com mensagens descritivas
 ---
-
+ 
 ## Ꮺ Comentários Adicionais ⁶
-
-**Aprendizados:** O maior desafio foi entender como o pipeline de CI funciona em conjunto com o Wokwi CLI, principalmente com o uso do Github Actions que em diferentes repositórios não apresentava erro. No mais, a utilização do mesmo servirá de ensinamento para projetos futuros.
-
+ 
+**Aprendizados:** O maior aprendizado foi a adaptação ao modelo de programação não bloqueante exigido por sistemas embarcados com loop único. Diferente de aplicações desktop, não é possível simplesmente "pausar" a execução — todos os componentes precisam ser gerenciados de forma cooperativa dentro do mesmo ciclo de atualização. O uso do Wokwi integrado ao GitHub Actions também foi um aprendizado valioso sobre CI/CD aplicado a hardware simulado, parte essa que foi dedicado cerca de 3 dias para resolução do problema, testando vários repositórios e modos de executar a mesma ideia do projeto.
+ 
 **Melhorias possíveis com mais tempo:**
-- Implementar leitura real dos botões de Entrada e Saída via interrupção (`machine.Pin.IRQ_FALLING`) para reiniciar o temporizador dinamicamente
-- Escrever diretamente no LCD via I²C usando a biblioteca `lcd_api` em vez de simular pelo serial
-- Adicionar múltiplas vagas com LEDs independentes, escalando o sistema para um estacionamento real
-- Salvar o histórico de uso em memória flash usando `uos` e `ujson`
+- Substituir os botões por sensores infravermelhos ou ultrassônicos para detecção automática de veículos
+- Adicionar um display LCD ou OLED para exibir o número de vagas em tempo real
+- Implementar comunicação MQTT para monitoramento remoto do status do estacionamento
+- Persistir o contador de vagas em memória não-volátil (NVS) para sobreviver a reinicializações
+- Adicionar múltiplas cancelas com controle independente para entrada e saída simultâneas
 
-**Limitação atual:** Os botões de Entrada e Saída estão presentes no circuito mas ainda não estão integrados à lógica do `main.py` — a simulação inicia automaticamente sem aguardar o acionamento do botão. Esta integração seria a próxima evolução natural do projeto.
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/d076ce24-634a-42b8-9e2a-ffa88816a7a9" width="45%" />
+  <img src="https://github.com/user-attachments/assets/d076ce24-634a-42b8-9e2a-ffa88816a7a9" width="45%" />
+</p>
+
